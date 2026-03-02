@@ -20,22 +20,31 @@ std::vector<range_t> bracket_roots(
     double precision = 0.01)
 {
     std::vector<range_t> result = {};
-    double step = std::abs(range.end - range.begin) / separation_parts;
+    const double step = std::abs(range.end - range.begin) / separation_parts;
 
     auto is_derivative_change_sign = [func](range_t range, int separation_parts = 5)
     {
-        auto find_derivative = [func](double x, double dx = 0.005)
+        auto find_derivative = [func](double x, double dx = 0.0005)
         {
             return (func(x + dx) - func(x)) / dx;
         };
 
-        double step = std::abs(range.end - range.begin) / separation_parts;
+        const double step = std::abs(range.end - range.begin) / separation_parts;
 
-        bool prev_sign = find_derivative(range.begin) > 0;
-        for (double i = range.begin; i < range.end; i += step)
+        const bool prev_sign = find_derivative(range.begin) >= 0;
+        for (int i = 0; i <= separation_parts; i++)
         {
-            bool sign = find_derivative(i) > 0;
+            double d = find_derivative(range.begin + i * step);
+
+            if (std::abs(d) < eps)
+                return true;
+
+            bool sign = d >= 0;
             if (sign != prev_sign)
+                return true;
+
+            if (std::abs(d) < eps ||
+                std::abs(find_derivative(range.begin + (i + 1) * step)) < eps)
                 return true;
         }
         return false;
@@ -49,8 +58,6 @@ std::vector<range_t> bracket_roots(
                 .end = range.begin + step * (i + 1),
             };
 
-        std::cout << current_range.begin << " " << current_range.end << "\n";
-
         if (is_derivative_change_sign(current_range) && step > precision)
         {
             auto recursion_result = bracket_roots(func, current_range, separation_parts, precision);
@@ -62,7 +69,7 @@ std::vector<range_t> bracket_roots(
 
             const bool sign_change = prod < 0;
             const bool touches_zero = std::abs(prod) < eps;
-            const bool no_duplicate = result.empty() || result.back().end != 0;
+            const bool no_duplicate = result.empty() || result.back().end != current_range.begin;
 
             if (sign_change || (touches_zero && no_duplicate))
             {
