@@ -41,22 +41,33 @@ std::vector<range_t> bracket_roots(
         return false;
     };
 
-    for (int i = 1; i <= separation_parts; i++)
+    for (int i = 0; i < separation_parts; i++)
     {
         range_t current_range =
             {
-                .begin = range.begin + step * (i - 1),
-                .end = range.begin + step * i,
+                .begin = range.begin + step * i,
+                .end = range.begin + step * (i + 1),
             };
+
+        std::cout << current_range.begin << " " << current_range.end << "\n";
 
         if (is_derivative_change_sign(current_range) && step > precision)
         {
             auto recursion_result = bracket_roots(func, current_range, separation_parts, precision);
             result.insert(result.end(), recursion_result.begin(), recursion_result.end());
         }
-        else if (func(current_range.begin) * func(current_range.end) <= 0)
+        else
         {
-            result.emplace_back(current_range);
+            const double prod = func(current_range.begin) * func(current_range.end);
+
+            const bool sign_change = prod < 0;
+            const bool touches_zero = std::abs(prod) < eps;
+            const bool no_duplicate = result.empty() || result.back().end != 0;
+
+            if (sign_change || (touches_zero && no_duplicate))
+            {
+                result.emplace_back(current_range);
+            }
         }
     }
 
