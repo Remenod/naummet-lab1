@@ -29,5 +29,8 @@ clean:
 
 run: $(TARGET)
 	./$(TARGET)
+	
+run_var12: $(TARGET)
+	cat var12.txt | ./$(TARGET)
 
 .PHONY: all clean run
