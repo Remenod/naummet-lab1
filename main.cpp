@@ -72,16 +72,23 @@ std::vector<range_t> bracket_roots(
         }
         else
         {
-            const double prod = func(current_range.begin) * func(current_range.end);
+            const double fa = func(current_range.begin);
+            const double fb = func(current_range.end);
 
-            const bool sign_change = prod < 0;
-            const bool touches_zero = std::abs(prod) < eps;
-            const bool no_duplicate = result.empty() || result.back().end != current_range.begin;
+            const bool b_is_zero = std::abs(fb) < eps;
 
-            if (sign_change || (touches_zero && no_duplicate))
+            const bool sign_change = fa * fb < 0;
+
+            auto is_duplicate_zero = [&](double x)
             {
+                if (result.empty())
+                    return false;
+
+                return std::abs(result.back().end - x) < eps;
+            };
+
+            if (sign_change || (b_is_zero && !is_duplicate_zero(current_range.end)))
                 result.emplace_back(current_range);
-            }
         }
     }
 
