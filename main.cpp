@@ -144,11 +144,14 @@ int main()
 
     std::vector<range_t> bracketed_roots = bracket_roots(func, range, 10, precision);
 
-    std::cout << "Found " << bracketed_roots.size() << " roots\n";
+    auto bracketed_roots_size = bracketed_roots.size();
+    std::cout << "Found " << bracketed_roots_size
+              << ((bracketed_roots_size == 1) ? " root" : " roots")
+              << "\n";
     for (auto el : bracketed_roots)
     {
         auto root = refine_roots(func, el, precision);
-        std::cout << "(" << el.begin << ", " << el.end << ")  ->   " << root << "\n";
+        std::cout << root << " on range (" << el.begin << ", " << el.end << ")\n";
     }
     te_free(e);
     return 0;
