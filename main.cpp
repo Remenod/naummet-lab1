@@ -104,7 +104,7 @@ double refine_roots(
     double fb = func(range.end);
 
     if (fa * fb > 0)
-        return (range.begin + range.end) / 2.0; // root existing is not garateed
+        return (range.begin + range.end) / 2.0; // root existing is not guaranteed
 
     while ((range.end - range.begin) > precision)
     {
