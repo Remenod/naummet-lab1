@@ -59,23 +59,24 @@ double refine_roots(
 std::vector<range_t> bracket_roots(
     std::function<double(double)> func,
     range_t range,
-    int separation_parts,
-    double precision,
+    int bracketing_subranges_count = _conf_bracketing_check_subranges,
+    double precision = _conf_bracketing_precision,
     bool search_for_tangent_roots = false)
 {
     auto find_derivative = [func](double x, double dx = _conf_derivative_precision)
     {
         return (func(x + dx) - func(x)) / dx;
     };
-    std::vector<range_t> result = {};
-    const double step = std::abs(range.end - range.begin) / separation_parts;
 
-    auto is_derivative_change_sign = [func, find_derivative](range_t range, int separation_parts = _conf_derivative_check_subranges)
+    auto is_derivative_change_sign =
+        [func, find_derivative](
+            range_t range,
+            int bracketing_subranges_count = _conf_derivative_check_subranges)
     {
-        const double step = std::abs(range.end - range.begin) / separation_parts;
-
+        const double step = std::abs(range.end - range.begin) / bracketing_subranges_count;
         const bool prev_sign = find_derivative(range.begin) > 0;
-        for (int i = 0; i <= separation_parts; i++)
+
+        for (int i = 0; i <= bracketing_subranges_count; i++)
         {
             bool sign = find_derivative(range.begin + i * step) >= 0;
             if (sign != prev_sign)
@@ -84,7 +85,10 @@ std::vector<range_t> bracket_roots(
         return false;
     };
 
-    for (int i = 0; i < separation_parts; i++)
+    std::vector<range_t> result = {};
+    const double step = std::abs(range.end - range.begin) / bracketing_subranges_count;
+
+    for (int i = 0; i < bracketing_subranges_count; i++)
     {
         range_t current_range =
             {
@@ -94,7 +98,12 @@ std::vector<range_t> bracket_roots(
 
         if (is_derivative_change_sign(current_range) && step > precision)
         {
-            auto recursion_result = bracket_roots(func, current_range, separation_parts, precision, true);
+            auto recursion_result = bracket_roots(func,
+                                                  current_range,
+                                                  bracketing_subranges_count,
+                                                  precision,
+                                                  true);
+
             result.insert(result.end(), recursion_result.begin(), recursion_result.end());
         }
         else
@@ -110,11 +119,19 @@ std::vector<range_t> bracket_roots(
             }
             else if (search_for_tangent_roots && !(step > precision))
             {
-                for (auto root_range : bracket_roots(find_derivative, current_range, 10, _conf_bracketing_precision))
+                auto ranges_with_root = bracket_roots(find_derivative,
+                                                      current_range,
+                                                      bracketing_subranges_count,
+                                                      precision);
+
+                for (auto range_with_root : ranges_with_root)
                 {
-                    auto dr = refine_roots(func, root_range, _conf_refining_precision);
-                    if (std::abs(func(dr)) < precision)
-                        result.emplace_back(range_t{dr, dr});
+                    auto derivative_root = refine_roots(func,
+                                                        range_with_root,
+                                                        precision);
+
+                    if (std::abs(func(derivative_root)) < precision)
+                        result.emplace_back(range_t{derivative_root, derivative_root});
                 }
             }
         }
@@ -125,7 +142,6 @@ std::vector<range_t> bracket_roots(
 
 int parse_config(void)
 {
-
     std::ifstream file("config.conf");
     std::string key, value;
 
@@ -198,22 +214,26 @@ int main()
     std::cin >> range.begin >> range.end;
 
     std::vector<range_t> bracketed_roots =
-        bracket_roots(func, range, _conf_bracketing_check_subranges, _conf_bracketing_precision, true);
+        bracket_roots(func,
+                      range,
+                      _conf_bracketing_check_subranges,
+                      _conf_bracketing_precision, true);
 
-    auto bracketed_roots_size = bracketed_roots.size();
     std::cout << "\033[32m"
-              << "Found " << bracketed_roots_size
-              << ((bracketed_roots_size == 1) ? " root" : " roots")
+              << "Found " << bracketed_roots.size()
+              << ((bracketed_roots.size() == 1) ? " root" : " roots")
               << "\033[0m"
               << "\n";
-    for (auto el : bracketed_roots)
+
+    for (auto range_with_root : bracketed_roots)
     {
-        auto root = refine_roots(func, el, _conf_refining_precision);
+        auto root = refine_roots(func, range_with_root, _conf_refining_precision);
         std::cout << root
                   << "\033[90m"
-                  << " on range (" << el.begin << ", " << el.end << ")\n"
+                  << " on range (" << range_with_root.begin << ", " << range_with_root.end << ")\n"
                   << "\033[0m";
     }
+
     te_free(e);
     return 0;
 }
