@@ -4,41 +4,44 @@
 #include <functional>
 #include <fstream>
 #include <string>
-#include "tinyexpr.h"
+#include <optional>
 
-#include <sstream>
+#include "tinyexpr.h"
 
 constexpr double eps = 1e-12;
 
-int _conf_derivative_check_subranges = 5;
-int _conf_bracketing_check_subranges = 10;
-double _conf_bracketing_precision = 0.01;
-double _conf_derivative_precision = 0.0005;
-double _conf_refining_precision = 0.01;
+struct Config
+{
+    int derivative_subranges_count = 5;
+    int bracketing_subranges_count = 10;
+    double bracketing_precision = 0.01;
+    double derivative_precision = 0.0005;
+    double refining_precision = 0.01;
+};
 
-typedef struct
+struct Range
 {
     double begin;
     double end;
-} range_t;
 
-double refine_roots(
-    std::function<double(double)> func,
-    range_t range,
-    double precision)
+    friend std::ostream &operator<<(std::ostream &out, const Range &rng)
+    {
+        out << "(" << rng.begin << ", " << rng.end << ")";
+        return out;
+    }
+};
+
+double refine_roots(std::function<double(double)> func, Range range, Config config)
 {
     double fa = func(range.begin);
     double fb = func(range.end);
 
-    if (fa * fb > 0)
-        return (range.begin + range.end) / 2.0; // root existing is not guaranteed
-
-    while ((range.end - range.begin) > precision)
+    while ((range.end - range.begin) > config.refining_precision)
     {
         double mid = (range.begin + range.end) / 2.0;
         double fm = func(mid);
 
-        if (std::abs(fm) < eps)
+        if (std::abs(fm) < config.refining_precision)
             return mid;
 
         if (fa * fm > 0)
@@ -56,54 +59,46 @@ double refine_roots(
     return (range.begin + range.end) / 2.0;
 }
 
-std::vector<range_t> bracket_roots(
+std::vector<Range> bracket_roots(
     std::function<double(double)> func,
-    range_t range,
-    int bracketing_subranges_count = _conf_bracketing_check_subranges,
-    double precision = _conf_bracketing_precision,
+    Range range,
+    Config config,
     bool search_for_tangent_roots = false)
 {
-    auto find_derivative = [func](double x, double dx = _conf_derivative_precision)
+    auto func_derivative = [func, config](double x)
     {
+        double dx = config.derivative_precision;
         return (func(x + dx) - func(x)) / dx;
     };
 
-    auto is_derivative_change_sign =
-        [func, find_derivative](
-            range_t range,
-            int bracketing_subranges_count = _conf_derivative_check_subranges)
+    auto is_derivative_change_sign = [func, func_derivative, config](Range range)
     {
-        const double step = std::abs(range.end - range.begin) / bracketing_subranges_count;
-        const bool prev_sign = find_derivative(range.begin) > 0;
+        const double step = std::abs(range.end - range.begin) / config.derivative_subranges_count;
+        const bool prev_sign = func_derivative(range.begin) > eps;
 
-        for (int i = 0; i <= bracketing_subranges_count; i++)
+        for (int i = 0; i <= config.derivative_subranges_count; i++)
         {
-            bool sign = find_derivative(range.begin + i * step) >= 0;
+            bool sign = func_derivative(range.begin + i * step) >= eps;
             if (sign != prev_sign)
                 return true;
         }
         return false;
     };
 
-    std::vector<range_t> result = {};
-    const double step = std::abs(range.end - range.begin) / bracketing_subranges_count;
+    std::vector<Range> result;
+    const double step = std::abs(range.end - range.begin) / config.bracketing_subranges_count;
 
-    for (int i = 0; i < bracketing_subranges_count; i++)
+    for (int i = 0; i < config.bracketing_subranges_count; i++)
     {
-        range_t current_range =
+        Range current_range =
             {
                 .begin = range.begin + step * i,
                 .end = range.begin + step * (i + 1),
             };
 
-        if (is_derivative_change_sign(current_range) && step > precision)
+        if (is_derivative_change_sign(current_range) && step > config.bracketing_precision)
         {
-            auto recursion_result = bracket_roots(func,
-                                                  current_range,
-                                                  bracketing_subranges_count,
-                                                  precision,
-                                                  true);
-
+            auto recursion_result = bracket_roots(func, current_range, config, true);
             result.insert(result.end(), recursion_result.begin(), recursion_result.end());
         }
         else
@@ -117,21 +112,16 @@ std::vector<range_t> bracket_roots(
             {
                 result.emplace_back(current_range);
             }
-            else if (search_for_tangent_roots && !(step > precision))
+            else if (search_for_tangent_roots && !(step > config.bracketing_precision))
             {
-                auto ranges_with_root = bracket_roots(find_derivative,
-                                                      current_range,
-                                                      bracketing_subranges_count,
-                                                      precision);
+                auto ranges_with_root = bracket_roots(func_derivative, current_range, config);
 
                 for (auto range_with_root : ranges_with_root)
                 {
-                    auto derivative_root = refine_roots(func,
-                                                        range_with_root,
-                                                        precision);
+                    auto derivative_root = refine_roots(func_derivative, range_with_root, config);
 
-                    if (std::abs(func(derivative_root)) < precision)
-                        result.emplace_back(range_t{derivative_root, derivative_root});
+                    if (std::abs(func(derivative_root)) < config.bracketing_precision)
+                        result.emplace_back(Range{derivative_root, derivative_root});
                 }
             }
         }
@@ -140,7 +130,7 @@ std::vector<range_t> bracket_roots(
     return result;
 }
 
-int parse_config(void)
+int parse_config(Config *config)
 {
     std::ifstream file("config.conf");
     std::string key, value;
@@ -158,66 +148,84 @@ int parse_config(void)
         key = key.substr(0, pos);
 
         if (key == "derivative_check_subranges")
-            _conf_derivative_check_subranges = std::stoi(value);
+            config->derivative_subranges_count = std::stoi(value);
         else if (key == "derivative_precision")
-            _conf_derivative_precision = std::stod(value);
+            config->derivative_precision = std::stod(value);
         else if (key == "refining_precision")
-            _conf_refining_precision = std::stod(value);
+            config->refining_precision = std::stod(value);
         else if (key == "bracketing_precision")
-            _conf_bracketing_precision = std::stod(value);
+            config->bracketing_precision = std::stod(value);
         else if (key == "bracketing_check_subranges")
-            _conf_bracketing_check_subranges = std::stoi(value);
+            config->bracketing_subranges_count = std::stoi(value);
     }
     return 0;
 }
 
-int main()
+std::string get_expression(void)
 {
-    if (parse_config())
-        std::cerr << "\033[33m"
-                  << "config.conf not fount. Using default values\n"
-                  << "\033[0m";
-
     std::cout
-        << "Enter an expression (e.g. " << "\033[4m" << "sin(x) - 0.5*cos(x^2)" << "\033[24m" << "):" << std::endl;
-    const char *expr;
+        << "Enter an expression (e.g. "
+        << "\033[4m"
+        << "sin(x) - 0.5*cos(x^2)"
+        << "\033[24m"
+        << "):\n";
 
     std::string line;
     std::getline(std::cin, line);
-    expr = line.size() < 1 ? "sin(x) - 0.5*cos(x^2)" : line.c_str();
+    return line.size() < 1 ? "sin(x) - 0.5*cos(x^2)" : line;
+}
 
-    double te_x = 0;
-    te_variable vars[] = {{"x", &te_x, TE_VARIABLE, NULL}};
+std::function<double(double)> get_func(const std::string &expr)
+{
+    double *te_x = new double(0);
+    te_variable vars[] = {{"x", te_x, TE_VARIABLE, NULL}};
     int err;
-    te_expr *e = te_compile(expr, vars, 1, &err);
+    te_expr *e = te_compile(expr.c_str(), vars, 1, &err);
 
     if (err)
     {
         std::string spaces(err - 1, ' ');
         std::cerr << "\033[31m"
                   << "\nAn error occured while parsing expression\n"
-                  << line << "\n"
+                  << expr << "\n"
                   << spaces << "^"
                   << "\033[0m"
                   << std::endl;
-        return 1;
+        delete te_x;
+        return {};
     }
 
-    auto func = [&e, &te_x](double x)
+    return [e, te_x](double x) mutable
     {
-        te_x = x;
+        *te_x = x;
         return te_eval(e);
     };
+}
 
+Range get_range(void)
+{
     std::cout << "Enter operating range:" << std::endl;
-    range_t range = {};
+    Range range;
     std::cin >> range.begin >> range.end;
+    return range;
+}
 
-    std::vector<range_t> bracketed_roots =
-        bracket_roots(func,
-                      range,
-                      _conf_bracketing_check_subranges,
-                      _conf_bracketing_precision, true);
+int main()
+{
+    Config config;
+    if (parse_config(&config))
+        std::cerr
+            << "\033[33m"
+            << "config.conf not fount. Using default values\n"
+            << "\033[0m";
+
+    auto func = get_func(get_expression());
+    if (!func)
+        return 1;
+
+    auto range = get_range();
+
+    std::vector<Range> bracketed_roots = bracket_roots(func, range, config, true);
 
     std::cout << "\033[32m"
               << "Found " << bracketed_roots.size()
@@ -227,13 +235,12 @@ int main()
 
     for (auto range_with_root : bracketed_roots)
     {
-        auto root = refine_roots(func, range_with_root, _conf_refining_precision);
+        auto root = refine_roots(func, range_with_root, config);
         std::cout << root
                   << "\033[90m"
-                  << " on range (" << range_with_root.begin << ", " << range_with_root.end << ")\n"
+                  << " on range " << range_with_root << "\n"
                   << "\033[0m";
     }
 
-    te_free(e);
     return 0;
 }
