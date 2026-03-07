@@ -94,7 +94,7 @@ std::vector<Range> bracket_roots(
 
         if (is_derivative_change_sign(current_range) && (step > config.bracketing_precision))
         {
-            auto recursion_result = bracket_roots(func, current_range, config, true);
+            auto recursion_result = bracket_roots(func, current_range, config, search_for_tangent_roots);
             result.insert(result.end(), recursion_result.begin(), recursion_result.end());
         }
         else
