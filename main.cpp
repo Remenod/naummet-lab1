@@ -30,11 +30,6 @@ struct Range
     }
 };
 
-static double find_derivative_value(std::function<double(double)> func, double x, double dx)
-{
-    return (func(x + dx) - func(x)) / dx;
-}
-
 double refine_root(std::function<double(double)> func, Range range, Config &config)
 {
     double fa = func(range.begin);
@@ -64,7 +59,12 @@ std::vector<Range> bracket_roots(
     Config &config,
     bool search_for_tangent_roots = false)
 {
-    auto func_derivative = [func, config](double x)
+    auto find_derivative_value = [](std::function<double(double)> func, double x, double dx)
+    {
+        return (func(x + dx) - func(x)) / dx;
+    };
+
+    auto func_derivative = [func, config, find_derivative_value](double x)
     {
         return find_derivative_value(func, x, config.derivative_precision);
     };
@@ -114,7 +114,7 @@ std::vector<Range> bracket_roots(
                 {
                     auto derivative_root = refine_root(func_derivative, range_with_root, config);
 
-                    auto is_root = [func, func_derivative, config](double x)
+                    auto is_root = [func, func_derivative, find_derivative_value, config](double x)
                     {
                         double second =
                             find_derivative_value(func_derivative, x, config.derivative_precision);
@@ -134,7 +134,7 @@ std::vector<Range> bracket_roots(
     return result;
 }
 
-int parse_config(Config *config)
+static int parse_config(Config *config)
 {
     std::ifstream file("config.conf");
     std::string key, value;
@@ -174,7 +174,7 @@ int parse_config(Config *config)
     return 0;
 }
 
-std::string get_expression(void)
+static std::string get_expression(void)
 {
     std::cout
         << "Enter an expression (e.g. "
@@ -188,7 +188,7 @@ std::string get_expression(void)
     return line.size() < 1 ? "sin(x) - 0.5*cos(x^2)" : line;
 }
 
-std::function<double(double)> get_func(const std::string &expr, int &err)
+static std::function<double(double)> get_func(const std::string &expr, int &err)
 {
     auto te_x = std::make_shared<double>(0);
 
@@ -208,7 +208,7 @@ std::function<double(double)> get_func(const std::string &expr, int &err)
     };
 }
 
-Range get_range(void)
+static Range get_range(void)
 {
     std::cout << "Enter operating range:" << "\n";
     Range range;
@@ -216,10 +216,9 @@ Range get_range(void)
     return range;
 }
 
-int main()
+static void print_config_status(int code)
 {
-    Config config;
-    switch (parse_config(&config))
+    switch (code)
     {
     case 1:
         std::cerr << "\033[33m"
@@ -244,33 +243,50 @@ int main()
                   << "\033[0m\n";
         break;
     }
+}
+
+static void print_expression_error(const std::string &expr, int err)
+{
+    std::string spaces(err - 1, ' ');
+    std::cerr << "\033[31m"
+              << "\nAn error occured while parsing expression\n"
+              << expr << "\n"
+              << spaces << "^"
+              << "\033[0m\n";
+}
+
+static void print_roots_found(int root_count)
+{
+    std::cout << "\033[32m"
+              << "Found " << root_count
+              << ((root_count == 1) ? " root" : " roots")
+              << "\033[0m"
+              << "\n";
+}
+
+int main()
+{
+    Config config;
+    print_config_status(parse_config(&config));
 
     auto expr = get_expression();
 
-    int err;
-    auto func = get_func(expr, err);
+    int func_err;
+    auto func = get_func(expr, func_err);
 
-    if (!func)
+    if (func_err)
     {
-        std::string spaces(err - 1, ' ');
-        std::cerr << "\033[31m"
-                  << "\nAn error occured while parsing expression\n"
-                  << expr << "\n"
-                  << spaces << "^"
-                  << "\033[0m\n";
+        print_expression_error(expr, func_err);
+        return 1;
     }
 
     auto range = get_range();
 
-    std::vector<Range> bracketed_roots = bracket_roots(func, range, config, true);
+    auto bracketed_roots = bracket_roots(func, range, config, true);
 
-    std::cout << "\033[32m"
-              << "Found " << bracketed_roots.size()
-              << ((bracketed_roots.size() == 1) ? " root" : " roots")
-              << "\033[0m"
-              << "\n";
+    print_roots_found(bracketed_roots.size());
 
-    for (auto range_with_root : bracketed_roots)
+    for (const auto &range_with_root : bracketed_roots)
     {
         auto root = refine_root(func, range_with_root, config);
         std::cout << root
