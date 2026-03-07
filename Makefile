@@ -29,13 +29,5 @@ clean:
 
 run: $(TARGET)
 	./$(TARGET)
-
-INPUT ?= input.txt
-
-run_file: $(TARGET)
-	./$(TARGET) < $(INPUT)
 	
-run_var12: $(TARGET)
-	printf "sin(x) - 0.5*cos(x^2)\n-6.5 6.5\n" | ./app
-
 .PHONY: all clean run
