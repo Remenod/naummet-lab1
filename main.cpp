@@ -62,8 +62,7 @@ std::vector<Range> bracket_roots(
     std::function<double(double)> func,
     Range range,
     Config &config,
-    bool search_for_tangent_roots = false,
-    int rec_depth = 0)
+    bool search_for_tangent_roots = false)
 {
     auto func_derivative = [func, config](double x)
     {
@@ -94,12 +93,9 @@ std::vector<Range> bracket_roots(
             .end = range.begin + step * (i + 1),
         };
 
-        std::string spaces(rec_depth, ' ');
-        std::cout << spaces << is_derivative_change_sign(current_range) << " " << ((step > config.bracketing_precision)) << " " << current_range << "\n";
-
         if (is_derivative_change_sign(current_range) && (step > config.bracketing_precision))
         {
-            auto recursion_result = bracket_roots(func, current_range, config, true, rec_depth + 1);
+            auto recursion_result = bracket_roots(func, current_range, config, true);
             result.insert(result.end(), recursion_result.begin(), recursion_result.end());
         }
         else
@@ -112,16 +108,11 @@ std::vector<Range> bracket_roots(
             }
             else if (search_for_tangent_roots && is_derivative_change_sign(current_range))
             {
-                std::cout << "Tangent stuff\n";
-                auto ranges_with_root = bracket_roots(func_derivative, current_range, config, false, rec_depth + 1);
+                auto ranges_with_root = bracket_roots(func_derivative, current_range, config);
 
                 for (auto range_with_root : ranges_with_root)
                 {
                     auto derivative_root = refine_root(func_derivative, range_with_root, config);
-
-                    std::cout << derivative_root << "\n"
-                              << func(derivative_root) << "\n"
-                              << func_derivative(derivative_root) << "\n";
 
                     auto is_root = [func, func_derivative, config](double x)
                     {
@@ -130,15 +121,11 @@ std::vector<Range> bracket_roots(
 
                         double C = std::abs(second) * 0.5 + eps;
 
-                        std::cout << "Second: " << second << "\n";
-                        std::cout << "C: " << C << "\n";
-
                         return std::abs(func(x)) < C * std::pow((config.refining_precision), 2);
                     };
 
                     if (is_root(derivative_root))
                         result.emplace_back(Range{derivative_root, derivative_root});
-                    std::cout << "\n";
                 }
             }
         }
