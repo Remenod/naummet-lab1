@@ -4,7 +4,6 @@
 #include <fstream>
 #include <string>
 #include <memory>
-#include <cmath>
 #include "tinyexpr.h"
 
 constexpr double eps = 1e-12;
@@ -121,7 +120,7 @@ std::vector<Range> bracket_roots(
 
                         double C = std::abs(second) * 0.5 + eps;
 
-                        return std::abs(func(x)) < C * std::pow((config.refining_precision), 2);
+                        return std::abs(func(x)) < C * config.refining_precision * config.refining_precision;
                     };
 
                     if (is_root(derivative_root))
