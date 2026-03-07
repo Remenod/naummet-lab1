@@ -13,9 +13,9 @@ struct Config
 {
     int derivative_subranges_count = 5;
     int bracketing_subranges_count = 10;
-    double bracketing_precision = 0.01;
-    double derivative_precision = 0.0005;
-    double refining_precision = 0.01;
+    double derivative_precision = 1e-3;
+    double refining_precision = 1e-2;
+    double bracketing_precision = 1e-2;
 };
 
 struct Range
