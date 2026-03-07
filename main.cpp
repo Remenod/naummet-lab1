@@ -84,14 +84,6 @@ std::vector<Range> bracket_roots(
     std::vector<Range> result;
     const double step = std::abs(range.end - range.begin) / config.bracketing_subranges_count;
 
-    auto is_duplicate = [result, config](double x)
-    {
-        if (result.empty())
-            return false;
-
-        return std::abs(result.back().end - x) < config.bracketing_precision;
-    };
-
     for (int i = 0; i < config.bracketing_subranges_count; i++)
     {
         Range current_range =
@@ -112,7 +104,7 @@ std::vector<Range> bracket_roots(
 
             const bool sign_change = fa * fb < 0;
 
-            if (sign_change && !is_duplicate(current_range.begin))
+            if (sign_change)
             {
                 result.emplace_back(current_range);
             }
@@ -124,8 +116,7 @@ std::vector<Range> bracket_roots(
                 {
                     auto derivative_root = refine_roots(func_derivative, range_with_root, config);
 
-                    if (std::abs(func(derivative_root)) < config.bracketing_precision &&
-                        !is_duplicate(derivative_root))
+                    if (std::abs(func(derivative_root) - func_derivative(derivative_root)) < eps)
                         result.emplace_back(Range{derivative_root, derivative_root});
                 }
             }
