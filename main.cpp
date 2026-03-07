@@ -163,15 +163,14 @@ int parse_config(Config *config)
             config->bracketing_subranges_count = std::stoi(value);
     }
 
-    if (config->derivative_precision < 1e-8)
-        return 2; // derivative_precision too small
+    if (config->derivative_precision < 1e-8 - eps)
+        return 2; // derivative_precision NOT >= 1e-8
 
-    if (config->refining_precision - config->derivative_precision > eps)
-        return 3; // refining_precision cant be bigger than derivative_precision
+    if (config->refining_precision <= config->derivative_precision + eps)
+        return 3; // refining_precision NOT > derivative_precision
 
-    if (config->bracketing_precision >= config->refining_precision - eps)
-        return 4; // bracketing_precision cant be bigger than refining_precision
-
+    if (config->bracketing_precision < config->refining_precision - eps)
+        return 4; // bracketing_precision NOT >= refining_precision
     return 0;
 }
 
@@ -246,14 +245,12 @@ int main()
         break;
     case 3:
         std::cerr << "\033[33m"
-                  << "Refining precision is larger (less accurate) than derivative precision.\n"
-                     "This may cause problems."
+                  << "Refining precision must be larger (less accurate) than derivative precision."
                   << "\033[0m\n";
         break;
     case 4:
         std::cerr << "\033[33m"
-                  << "Derivative precision is larger (less accurate) than refining precision.\n"
-                     "This may cause problems."
+                  << "Bracketing precision must be larger (less accurate) than or equal to refining precision."
                   << "\033[0m\n";
         break;
     }
