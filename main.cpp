@@ -54,7 +54,7 @@ double refine_root(mathfunc func, Range range, Config &config)
     return (range.begin + range.end) / 2.0;
 }
 
-std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config)
+std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config, bool search_for_tangent = true)
 {
     auto find_derivative_value = [](mathfunc func, double x, double dx)
     {
@@ -90,9 +90,11 @@ std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config)
             .end = range.begin + step * (i + 1),
         };
 
-        if (is_derivative_change_sign(current_range) && (step > config.bracketing_precision))
+        const bool derivative_change_sign = is_derivative_change_sign(current_range);
+
+        if (derivative_change_sign && (step > config.bracketing_precision))
         {
-            auto recursion_result = bracket_roots(func, current_range, config);
+            auto recursion_result = bracket_roots(func, current_range, config, true);
             result.insert(result.end(), recursion_result.begin(), recursion_result.end());
         }
         else
@@ -103,13 +105,13 @@ std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config)
             {
                 result.emplace_back(current_range);
             }
-            else if (is_derivative_change_sign(current_range))
+            else if (derivative_change_sign && search_for_tangent)
             {
-                auto ranges_with_root = bracket_roots(func_derivative, current_range, config);
+                auto ranges_with_extremum = bracket_roots(func_derivative, current_range, config, false);
 
-                for (auto range_with_root : ranges_with_root)
+                for (auto range_with_extremum : ranges_with_extremum)
                 {
-                    auto derivative_root = refine_root(func_derivative, range_with_root, config);
+                    auto derivative_root = refine_root(func_derivative, range_with_extremum, config);
 
                     auto is_root = [func, func_derivative, find_derivative_value, config](double x)
                     {
@@ -280,7 +282,7 @@ int main()
 
     auto range = get_range();
 
-    auto bracketed_roots = bracket_roots(func, range, config);
+    auto bracketed_roots = bracket_roots(func, range, config, false);
 
     print_roots_found(bracketed_roots.size());
 
