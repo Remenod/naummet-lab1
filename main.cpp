@@ -79,11 +79,11 @@ std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config, boo
     auto is_derivative_change_sign = [func, func_derivative, config](Range range)
     {
         const double step = std::abs(range.end - range.begin) / config.derivative_subranges_count;
-        const bool prev_sign = func_derivative(range.begin) > 0;
+        const bool prev_sign = func_derivative(range.begin) >= eps;
 
         for (int i = 0; i <= config.derivative_subranges_count; i++)
         {
-            bool sign = func_derivative(range.begin + i * step) > 0;
+            bool sign = func_derivative(range.begin + i * step) >= 0;
             if (sign != prev_sign)
                 return true;
         }
@@ -101,7 +101,7 @@ std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config, boo
         };
 
         const bool derivative_change_sign = is_derivative_change_sign(current_range);
-        const bool func_change_sign = func(current_range.begin) * func(current_range.end) < 0;
+        const bool func_change_sign = func(current_range.begin + eps) * func(current_range.end) <= 0;
 
         if (derivative_change_sign)
         {
