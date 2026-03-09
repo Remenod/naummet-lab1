@@ -9,6 +9,7 @@
 typedef std::function<double(double)> mathfunc;
 
 constexpr double eps = 1e-12;
+constexpr char default_expr[] = "sin(x) - 0.5*cos(x^2)";
 
 struct Config
 {
@@ -121,9 +122,7 @@ std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config, boo
                     auto is_root = [func, func_derivative, find_derivative_value, config](double x)
                     {
                         double second = find_derivative_value(func_derivative, x, config.derivative_precision);
-
                         double C = std::abs(second) * 0.5 + eps;
-
                         double delta = config.refining_precision / 2;
 
                         return std::abs(func(x)) < C * delta * delta;
@@ -191,13 +190,12 @@ static std::string get_expression(void)
     std::cout
         << "Enter an expression (e.g. "
         << "\033[4m"
-        << "sin(x) - 0.5*cos(x^2)"
-        << "\033[24m"
-        << "):\n";
+        << default_expr
+        << "\033[24m):\n";
 
     std::string line;
     std::getline(std::cin, line);
-    return line.size() < 1 ? "sin(x) - 0.5*cos(x^2)" : line;
+    return line.size() < 1 ? default_expr : line;
 }
 
 static mathfunc get_func(const std::string &expr, int &err)
@@ -232,6 +230,8 @@ static void print_config_status(config_status code)
 {
     switch (code)
     {
+    case config_status::OK:
+        break;
     case config_status::FILE_NOT_FOUND:
         std::cerr << "\033[33m"
                   << "config.conf not found.\n"
@@ -276,10 +276,8 @@ static void print_expression_error(const std::string &expr, int err)
 static void print_roots_found(int root_count)
 {
     std::cout << "\033[32m"
-              << "Found " << root_count
-              << ((root_count == 1) ? " root" : " roots")
-              << "\033[0m"
-              << "\n";
+              << "Found " << root_count << ((root_count == 1) ? " root" : " roots")
+              << "\033[0m\n";
 }
 
 int main()
