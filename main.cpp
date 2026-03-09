@@ -162,14 +162,17 @@ static int parse_config(Config *config)
             config->bracketing_subranges_count = std::stoi(value);
     }
 
+    if (config->derivative_subranges_count < 2)
+        return 2;
+
     if (config->derivative_precision < 1e-8 - eps)
-        return 2; // derivative_precision NOT >= 1e-8
+        return 3; // derivative_precision NOT >= 1e-8
 
     if (config->refining_precision <= config->derivative_precision + eps)
-        return 3; // refining_precision NOT > derivative_precision
+        return 4; // refining_precision NOT > derivative_precision
 
     if (config->bracketing_precision < config->refining_precision - eps)
-        return 4; // bracketing_precision NOT >= refining_precision
+        return 5; // bracketing_precision NOT >= refining_precision
     return 0;
 }
 
@@ -227,16 +230,22 @@ static void print_config_status(int code)
         break;
     case 2:
         std::cerr << "\033[31m"
+                     "Bracketing subranges count is lower than 2.\n"
+                     "At least two subranges are required to perform root bracketing."
+                  << "\033[0m\n";
+        break;
+    case 3:
+        std::cerr << "\033[31m"
                   << "Derivative precision is smaller than the recommended minimum (1e-8).\n"
                      "Floating-point calculation noise may corrupt the output."
                   << "\033[0m\n";
         break;
-    case 3:
+    case 4:
         std::cerr << "\033[33m"
                   << "Refining precision must be larger (less accurate) than derivative precision."
                   << "\033[0m\n";
         break;
-    case 4:
+    case 5:
         std::cerr << "\033[33m"
                   << "Bracketing precision must be larger (less accurate) than or equal to refining precision."
                   << "\033[0m\n";
