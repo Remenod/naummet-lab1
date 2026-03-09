@@ -19,6 +19,16 @@ struct Config
     double bracketing_precision = 1e-2;
 };
 
+enum class config_status
+{
+    OK,
+    FILE_NOT_FOUND,
+    NOT_ENOUGH_BRACKETING_SUBRANGES,
+    DERIVATIVE_PRECISION_TOO_SMALL,
+    REFINING_PRECISION_TOO_SMALL,
+    BRACKETING_PRECISION_TOO_SMALL,
+};
+
 struct Range
 {
     double begin;
@@ -133,13 +143,13 @@ std::vector<Range> bracket_roots(mathfunc func, Range range, Config &config, boo
     return result;
 }
 
-static int parse_config(Config *config)
+static config_status parse_config(Config *config)
 {
     std::ifstream file("config.conf");
     std::string key, value;
 
     if (!file.is_open())
-        return 1;
+        return config_status::FILE_NOT_FOUND;
 
     while (file >> key)
     {
@@ -163,17 +173,17 @@ static int parse_config(Config *config)
     }
 
     if (config->derivative_subranges_count < 2)
-        return 2;
+        return config_status::NOT_ENOUGH_BRACKETING_SUBRANGES;
 
     if (config->derivative_precision < 1e-8 - eps)
-        return 3; // derivative_precision NOT >= 1e-8
+        return config_status::DERIVATIVE_PRECISION_TOO_SMALL; // derivative_precision NOT >= 1e-8
 
     if (config->refining_precision <= config->derivative_precision + eps)
-        return 4; // refining_precision NOT > derivative_precision
+        return config_status::REFINING_PRECISION_TOO_SMALL; // refining_precision NOT > derivative_precision
 
     if (config->bracketing_precision < config->refining_precision - eps)
-        return 5; // bracketing_precision NOT >= refining_precision
-    return 0;
+        return config_status::REFINING_PRECISION_TOO_SMALL; // bracketing_precision NOT >= refining_precision
+    return config_status::OK;
 }
 
 static std::string get_expression(void)
@@ -218,34 +228,34 @@ static Range get_range(void)
     return range;
 }
 
-static void print_config_status(int code)
+static void print_config_status(config_status code)
 {
     switch (code)
     {
-    case 1:
+    case config_status::FILE_NOT_FOUND:
         std::cerr << "\033[33m"
                   << "config.conf not found.\n"
                      "Using default values."
                   << "\033[0m\n";
         break;
-    case 2:
+    case config_status::NOT_ENOUGH_BRACKETING_SUBRANGES:
         std::cerr << "\033[31m"
                      "Bracketing subranges count is lower than 2.\n"
                      "At least two subranges are required to perform root bracketing."
                   << "\033[0m\n";
         break;
-    case 3:
+    case config_status::DERIVATIVE_PRECISION_TOO_SMALL:
         std::cerr << "\033[31m"
                   << "Derivative precision is smaller than the recommended minimum (1e-8).\n"
                      "Floating-point calculation noise may corrupt the output."
                   << "\033[0m\n";
         break;
-    case 4:
+    case config_status::REFINING_PRECISION_TOO_SMALL:
         std::cerr << "\033[33m"
                   << "Refining precision must be larger (less accurate) than derivative precision."
                   << "\033[0m\n";
         break;
-    case 5:
+    case config_status::BRACKETING_PRECISION_TOO_SMALL:
         std::cerr << "\033[33m"
                   << "Bracketing precision must be larger (less accurate) than or equal to refining precision."
                   << "\033[0m\n";
@@ -275,7 +285,10 @@ static void print_roots_found(int root_count)
 int main()
 {
     Config config;
-    print_config_status(parse_config(&config));
+    auto config_status = parse_config(&config);
+    print_config_status(config_status);
+    if (config_status == config_status::NOT_ENOUGH_BRACKETING_SUBRANGES)
+        return 2;
 
     auto expr = get_expression();
 
